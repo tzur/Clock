@@ -16,14 +16,16 @@ class ClockContainer extends Component<EmptyProps, ClockState> {
     }
   }
 
-  updateClockState() {
+  componentDidMount(){
+    this.updateClockState()
+  }
+
+  private updateClockState() {
     this.setState({
       time: new Date()
     });
-  }
 
-  componentDidMount(){
-    setInterval(() => this.updateClockState(), 1)
+    requestAnimationFrame(this.updateClockState.bind(this))
   }
 
   render() {
