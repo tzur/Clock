@@ -42,22 +42,18 @@ export default function AnalogClock(props: ClockState) {
             const hours = clockState.time.getHours() % 12;
             const minutes = clockState.time.getMinutes() ;
             const seconds = clockState.time.getSeconds();
-            const miliseconds = clockState.time.getMilliseconds()
     
             const hoursInDegrees = (hours * 30) + (0.5 * minutes)
             const minutesInDegrees = (minutes * 6) + (0.1 * seconds);
             const secondsInDegrees = seconds * 6;
-            const milisecondsInDegrees = miliseconds / (1000 / 360);
     
             const hoursInRadians = degreesToRadians(hoursInDegrees)
             const minutesInRadians = degreesToRadians(minutesInDegrees)
             const secondsInRadians = degreesToRadians(secondsInDegrees)
-            const milisecondsInRadians = degreesToRadians(milisecondsInDegrees)
     
             drawClockLine(context, width, height, hoursInRadians, 9)
             drawClockLine(context, width, height, minutesInRadians, 6)
             drawClockLine(context, width, height, secondsInRadians, 3)
-            drawClockLine(context, width, height, milisecondsInRadians, 1)
         }
     
         const degreesToRadians = (degrees: number) => {
