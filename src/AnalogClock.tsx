@@ -1,15 +1,33 @@
 import React, { useEffect, RefObject } from 'react';
-import type { ClockState } from './ClockContainer'
+import {OffsetNeedle} from './AnalogClockContainer';
+import type {point} from './AnalogClockContainer';
 
-export default function AnalogClock(props: ClockState) {
+type AnalogClockDrawingModel = {
+    hoursAngle: number,
+    minutesAngle: number,
+    secondsAngle: number,
+    onNeedleOffsetChange: (offsetPoint: point) => void,
+    needlePressed: (needle: OffsetNeedle) => void,
+    needleReleased: () => void
+}
+
+export default function AnalogClock(props: AnalogClockDrawingModel) {
     const canvasRef: RefObject<HTMLCanvasElement> = React.createRef()
+    type point = {
+        x: number,
+        y: number
+    }
+    type line = {
+        start: point,
+        end: point
+    }
+
     useEffect(() => {  
-        const drawClock = (clockState: ClockState) => {
-            const canvas = canvasRef.current
-            if (canvas === null) {
-                return
-            }
-    
+        const canvas = canvasRef.current
+        if (canvas === null) {
+            return
+        }
+        const drawClock = (clockState: AnalogClockDrawingModel) => {
             const context = canvas.getContext("2d")
             if (context === null) {
               return
@@ -37,50 +55,118 @@ export default function AnalogClock(props: ClockState) {
             context.fillText("6", clockRadius - 3.5, width - clockEdgesInset + 7);
             context.fillText("3", width - clockEdgesInset, clockRadius + 3.5);
         }
-    
-        const drawClockTimers = (context: CanvasRenderingContext2D, width: number, height: number, clockState: ClockState) => {
-            const hours = clockState.time.getHours() % 12;
-            const minutes = clockState.time.getMinutes() ;
-            const seconds = clockState.time.getSeconds();
-    
-            const hoursInDegrees = (hours * 30) + (0.5 * minutes)
-            const minutesInDegrees = (minutes * 6) + (0.1 * seconds);
-            const secondsInDegrees = seconds * 6;
-    
-            const hoursInRadians = degreesToRadians(hoursInDegrees)
-            const minutesInRadians = degreesToRadians(minutesInDegrees)
-            const secondsInRadians = degreesToRadians(secondsInDegrees)
-    
-            drawClockLine(context, width, height, hoursInRadians, 9)
-            drawClockLine(context, width, height, minutesInRadians, 6)
-            drawClockLine(context, width, height, secondsInRadians, 3)
+
+        const drawClockTimers = (context: CanvasRenderingContext2D, width: number, 
+            height: number, clockState: AnalogClockDrawingModel) => {            
+            drawClockLine(context, clockState.hoursAngle, 9, {x: width / 2, y: height / 2})
+            drawClockLine(context, clockState.minutesAngle, 6, {x: width / 2, y: height / 2})
+            drawClockLine(context, clockState.secondsAngle, 3, {x: width / 2, y: height / 2})
         }
     
-        const degreesToRadians = (degrees: number) => {
-          return degrees * Math.PI / 180
-        }
-    
-        const drawClockLine = (context: CanvasRenderingContext2D, clockWidth: number, clockHeight: number, lineAngle: number,
-             lineWidth: number) => {
-            const startPoint = {
-                x: clockWidth / 2,
-                y: clockHeight / 2
-            }
-    
-            context.translate(startPoint.x, startPoint.y)
-            context.rotate(lineAngle);
-            context.translate(-startPoint.x, -startPoint.y)
-        
+        const drawClockLine = (context: CanvasRenderingContext2D, lineAngle: number, lineWidth: number, startPoint: point) => {
+            const line = clockLine(200, lineAngle, startPoint.x, startPoint.y)        
             context.beginPath()
-            context.moveTo(startPoint.x, startPoint.y)
-            context.lineTo(startPoint.x, 80)
+            context.moveTo(line.start.x, line.start.y)
+            context.lineTo(line.end.x, line.end.y)
             context.lineWidth = lineWidth
             context.stroke()
             context.closePath()
-            context.setTransform(1,0,0,1,0,0);
+        }
+
+        const clockLine = (lineLength: number, lineAngle: number,  startPointX: number, startPointY: number) => {
+            const startPoint = {
+                x: startPointX,
+                y: startPointY
+            }
+    
+            const endPoint = {
+                x: startPoint.x + Math.cos(lineAngle) * 200,
+                y: startPoint.y + Math.sin(lineAngle) * 200
+            }
+    
+            return {start: startPoint, end: endPoint}
         }
 
         drawClock(props);
+        const mouseUpEvent = (event: MouseEvent)=> {
+            props.needleReleased()
+        }
+
+        const mouseMoveEvent = (event: MouseEvent)=> {
+            const canvasRect = canvas.getBoundingClientRect()
+            const mousePoint = {
+                x: event.clientX - canvasRect.left,
+                y: event.clientY - canvasRect.top
+            }
+
+            const mouseNormalizedPoint: point = {
+                x: (mousePoint.x - 250) / 250,
+                y: (mousePoint.y - 250) / 250
+            }
+            props.onNeedleOffsetChange(mouseNormalizedPoint)
+        }
+
+        const mouseDownEvent = (event: MouseEvent)=> {
+            const canvasRect = canvas.getBoundingClientRect()
+            const mousePoint = {
+                x: event.clientX - canvasRect.left,
+                y: event.clientY - canvasRect.top
+            }
+
+            const hours = clockLine(200, props.hoursAngle, canvas.width / 2, canvas.height / 2)
+            const minutes = clockLine(200, props.minutesAngle, canvas.width / 2, canvas.height / 2)
+            const seconds = clockLine(200, props.secondsAngle, canvas.width / 2, canvas.height / 2)
+
+            const isHoursClicked = isClockLinePressed(hours, mousePoint)
+            const isMinutesClicked = isClockLinePressed(minutes, mousePoint)
+            const isSecondsClicked = isClockLinePressed(seconds, mousePoint)
+
+            if (isHoursClicked) {
+                props.needlePressed(OffsetNeedle.Hours)
+                return
+            } 
+
+             if (isMinutesClicked) {
+                props.needlePressed(OffsetNeedle.Minutes)
+                return
+             }
+
+             if (isSecondsClicked) {
+                props.needlePressed(OffsetNeedle.Seconds)
+             }
+        }
+
+        const isClockLinePressed = (clockLine: line, mousePoint: point) => {
+            const crossproduct =
+                (mousePoint.y - clockLine.start.y) * (clockLine.end.x - clockLine.start.x) - 
+                (mousePoint.x - clockLine.start.x) * (clockLine.end.y - clockLine.start.y)
+            if (Math.abs(crossproduct) > 500) {
+                return false
+            }
+
+            const dotproduct = (mousePoint.x - clockLine.start.x) * (clockLine.end.x - clockLine.start.x) + 
+                (mousePoint.y - clockLine.start.y) * (clockLine.end.y - clockLine.start.y)
+            if (dotproduct < 0) {
+                return false
+            }
+
+            const swuaredLentgh = Math.pow((clockLine.end.x - clockLine.start.x), 2) + Math.pow((clockLine.end.y - clockLine.start.y), 2)
+            if (dotproduct > swuaredLentgh) {
+                return false
+            }
+
+            return true
+        }
+
+        canvas.addEventListener("mousedown", mouseDownEvent)
+        canvas.addEventListener("mouseup", mouseUpEvent)
+        canvas.addEventListener("mousemove", mouseMoveEvent)
+        return (()=> {
+            canvas.removeEventListener("mousedown", mouseDownEvent)
+            canvas.removeEventListener("mouseup", mouseUpEvent)
+            canvas.removeEventListener("mousemove", mouseMoveEvent)
+
+        })
     }, [canvasRef, props]);
 
     return(
